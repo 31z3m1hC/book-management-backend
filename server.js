@@ -31,7 +31,7 @@ mongoose.connect(process.env.MONGODB_URI)
 // HOME - Check if API is working
 app.get('/api', (req, res) => {
   res.json({
-    message: '✅ Book Management API is running!',
+    message: 'Book Management API is running!',
     endpoints: {
       getAll: 'GET /api/books',
       getOne: 'GET /api/books/:id',
@@ -92,7 +92,7 @@ app.get('/api/books/:id', async (req, res) => {
 });
 
 
-// ➕ CREATE NEW BOOK
+// CREATE NEW BOOK
 app.post('/api/books', async (req, res) => {
   try {
     const { title, author, published, rating, yearPublished, isbn } = req.body;
@@ -138,7 +138,7 @@ app.post('/api/books', async (req, res) => {
 });
 
 
-// ✏️ UPDATE BOOK
+// UPDATE BOOK
 app.put('/api/books/:id', async (req, res) => {
   try {
     const { title, author, published, rating, yearPublished, isbn } = req.body;
