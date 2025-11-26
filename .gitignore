@@ -1,5 +1,7 @@
 # Ignore ALL node_modules folders
 node_modules/
+seed-admin.js
+
 
 # Ignore ALL package files
 package-lock.json
