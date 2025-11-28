@@ -5,13 +5,22 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();  // Load .env variables
 
+// Add these imports at the top of server.js (after existing imports)
+const jwt = require('jsonwebtoken');
+const User = require('./models/User');
+
 // Step 2: Import Book model
 //const Book = require('./models/Book');
 const Book = require('./models/Book');
 
+
 // Step 3: Create Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+
+// Add this secret key after your other constants
+const JWT_SECRET = process.env.JWT_SECRET || "MyApp!2025#ChangeThis$ToRandom";
 
 // Step 4: Middleware (helps Express understand data)
 app.use(cors());              // Allow requests from any website
@@ -31,7 +40,7 @@ mongoose.connect(process.env.MONGODB_URI)
 // HOME - Check if API is working
 app.get('/api', (req, res) => {
   res.json({
-    message: '✅ Book Management API is running!',
+    message: 'Book Management API is running!',
     endpoints: {
       getAll: 'GET /api/books',
       getOne: 'GET /api/books/:id',
@@ -92,7 +101,7 @@ app.get('/api/books/:id', async (req, res) => {
 });
 
 
-// ➕ CREATE NEW BOOK
+// CREATE NEW BOOK
 app.post('/api/books', async (req, res) => {
   try {
     const { title, author, published, rating, yearPublished, isbn } = req.body;
@@ -138,7 +147,7 @@ app.post('/api/books', async (req, res) => {
 });
 
 
-// ✏️ UPDATE BOOK
+// UPDATE BOOK
 app.put('/api/books/:id', async (req, res) => {
   try {
     const { title, author, published, rating, yearPublished, isbn } = req.body;
@@ -228,6 +237,232 @@ app.get('/api/books/search/:query', async (req, res) => {
     });
   }
 });
+
+
+// Add this middleware function after your existing middleware
+const authenticateToken = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1]; // Get token from "Bearer TOKEN"
+  
+  if (!token) {
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Access denied. No token provided.' 
+    });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(403).json({ 
+      success: false, 
+      message: 'Invalid or expired token' 
+    });
+  }
+};
+
+// ============================================
+// ADD THESE AUTHENTICATION ROUTES
+// (Add after your existing routes, before app.listen)
+// ============================================
+
+// REGISTER - Create new user account
+app.post('/api/register', async (req, res) => {
+  try {
+    const { username, email, password, fullName } = req.body;
+    
+    // Check if required fields are provided
+    if (!username || !email || !password || !fullName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide username, email, password, and fullName'
+      });
+    }
+    
+    // Check if user already exists
+    const existingUser = await User.findOne({ 
+      $or: [{ email }, { username }] 
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username or email already exists'
+      });
+    }
+    
+    // Create new user (password will be hashed automatically by User model)
+    const user = await User.create({
+      username,
+      email,
+      password,
+      fullName,
+      role: 'user' // Default role
+    });
+    
+    // Create JWT token
+    const token = jwt.sign(
+      { id: user._id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' } // Token expires in 7 days
+    );
+    
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully!',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error registering user',
+      error: error.message
+    });
+  }
+});
+
+// LOGIN - Authenticate user
+app.post('/api/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    // Check if credentials provided
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide username and password'
+      });
+    }
+    
+    // Find user
+    const user = await User.findOne({ username });
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid username or password'
+      });
+    }
+    
+    // Check password
+    const isPasswordCorrect = await user.comparePassword(password);
+    
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid username or password'
+      });
+    }
+    
+    // Create JWT token
+    const token = jwt.sign(
+      { id: user._id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Login successful!',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error logging in',
+      error: error.message
+    });
+  }
+});
+
+// GET PROFILE - Get current user info (Protected Route)
+app.get('/api/profile', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching profile',
+      error: error.message
+    });
+  }
+});
+
+
+// UPDATE ADMIN PASSWORD (Protected Route)
+app.put('/api/admin/update-password', authenticateToken, async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+
+    if (!newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a new password'
+      });
+    }
+
+    // Only allow admins to update their password
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Only admins can update their password.'
+      });
+    }
+
+    // Find the admin user
+    const admin = await User.findById(req.user.id);
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Admin user not found'
+      });
+    }
+
+    // Set new password (will be hashed by pre('save') hook)
+    admin.password = newPassword;
+    await admin.save();
+
+    res.json({
+      success: true,
+      message: 'Admin password updated successfully!'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating admin password',
+      error: error.message
+    });
+  }
+});
+
+
 
 
 // ============================================

@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Login - Book Management</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet" />
+<style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: "Poppins", sans-serif;
+            background: linear-gradient(135deg, #5563de, #74abe2);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: #5563de;
+            color: white;
+            padding: 40px;
+            max-width: 420px;
+            width: 100%;
+            border-radius: 12px;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.15);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color:white;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: white;
+            font-size: 0.9rem;
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            text-align: left;
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1.8px solid #ddd;
+            font-size: 1rem;
+            transition: 0.3s;
+        }
+
+        input:focus {
+            border-color: #5563de;
+            outline: none;
+        }
+
+        input.error {
+            border-color: #d9534f;
+        }
+
+        .error-text {
+            color: #d9534f;
+            margin-top: 5px;
+            font-size: 0.8rem;
+            display: none;
+        }
+
+        .error-text.show { display: block; }
+
+        .password-requirements {
+            font-size: 0.8rem;
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 8px;
+            margin-top: 6px;
+            display: none;
+        }
+
+        .password-requirements.show { display: block; }
+
+        .password-requirements .requirement { color: #d9534f; }
+        .password-requirements .valid { color: #28a745; }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            background: #5563de;
+            color: #fff;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .toggle-form {
+            margin-top: 18px;
+            font-size: 0.85rem;
+            color: white;
+        }
+
+        .toggle-form a {
+            color: white;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .toggle-form a:hover { text-decoration: underline; }
+
+        .hidden { display: none; }
+
+        /* Modal Styling */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: white;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.show { display: flex; }
+
+        .modal-content {
+            background: #fff;
+            color: white;
+            width: 92%;
+            max-width: 380px;
+            border-radius: 12px;
+            padding: 35px 25px;
+            text-align: center;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+        }
+
+        .modal-icon.error { color: #d9534f; }
+        .modal-icon.success { color: #28a745; }
+
+        .modal-title {
+            font-weight: 700;
+            font-size: 1.4rem;
+            margin-bottom: 8px;
+        }
+
+        .modal-message { font-size: 0.95rem; color: #555; margin-bottom: 18px; }
+
+        .btn, .modal-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            background: #ffbd3d; 
+            color: white;       
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            margin-top: 10px;
+        }
+
+        .btn:hover, .modal-btn:hover {
+            background: #90ee90; 
+            transform: translateY(-2px);
+        }
+</style>
+</head>
+
+<body>
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <div id="modalIcon" class="modal-icon"></div>
+        <div id="modalTitle" class="modal-title"></div>
+        <div id="modalMessage" class="modal-message"></div>
+        <button class="modal-btn" onclick="closeModal()">OK</button>
+    </div>
+</div>
+
+<div class="container">
+    <h1>Book Manager</h1>
+    <p class="subtitle">Manage your book collection</p>
+
+    <form id="loginForm">
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="loginUsername" required />
+            <div class="error-text" id="loginUsernameError">Username is required</div>
+        </div>
+
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="loginPassword" required />
+            <div class="error-text" id="loginPasswordError">Password is required</div>
+        </div>
+
+        <button type="submit" class="btn" id="loginBtn">Login</button>
+
+        <div class="toggle-form">
+            Don't have an account? <a href="#" id="showRegister">Register here</a>
+        </div>
+    </form>
+
+    <form id="registerForm" class="hidden">
+        <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="regFullName" />
+            <div class="error-text" id="regFullNameError">Full name is required</div>
+        </div>
+
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="regUsername" />
+            <div class="error-text" id="regUsernameError">Username is required</div>
+        </div>
+
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="regEmail" />
+            <div class="error-text" id="regEmailError">Valid email required</div>
+        </div>
+
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="regPassword" />
+            <div class="password-requirements" id="passwordRequirements">
+                <strong>Password must contain:</strong>
+                <ul>
+                    <li class="requirement" id="req-length">✗ At least 6 characters</li>
+                    <li class="requirement" id="req-letter">✗ At least one letter</li>
+                    <li class="requirement" id="req-number">✗ At least one number</li>
+                    <li class="requirement" id="req-special">✗ One special character</li>
+                </ul>
+            </div>
+            <div class="error-text" id="regPasswordError">Invalid password</div>
+        </div>
+
+        <button type="submit" class="btn" id="registerBtn">Register</button>
+
+        <div class="toggle-form">
+            Already have an account? <a href="#" id="showLogin">Login here</a>
+        </div>
+    </form>
+</div>
+    
+    <script>
+
+        import router from './router';
+
+        const API_URL = 'http://localhost:3000/api';
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const showRegisterLink = document.getElementById('showRegister');
+        const showLoginLink = document.getElementById('showLogin');
+        const modal = document.getElementById('modal');
+        
+        // Password validation
+        const regPassword = document.getElementById('regPassword');
+        const passwordRequirements = document.getElementById('passwordRequirements');
+        
+        regPassword.addEventListener('focus', () => {
+            passwordRequirements.classList.add('show');
+        });
+        
+        regPassword.addEventListener('input', (e) => {
+            const password = e.target.value;
+            
+            // Check length
+            const lengthReq = document.getElementById('req-length');
+            if (password.length >= 6) {
+                lengthReq.classList.add('valid');
+                lengthReq.textContent = '✓ At least 6 characters';
+            } else {
+                lengthReq.classList.remove('valid');
+                lengthReq.textContent = '✗ At least 6 characters';
+            }
+            
+            // Check letter
+            const letterReq = document.getElementById('req-letter');
+            if (/[a-zA-Z]/.test(password)) {
+                letterReq.classList.add('valid');
+                letterReq.textContent = '✓ At least one letter (a-z)';
+            } else {
+                letterReq.classList.remove('valid');
+                letterReq.textContent = '✗ At least one letter (a-z)';
+            }
+            
+            // Check number
+            const numberReq = document.getElementById('req-number');
+            if (/[0-9]/.test(password)) {
+                numberReq.classList.add('valid');
+                numberReq.textContent = '✓ At least one number (0-9)';
+            } else {
+                numberReq.classList.remove('valid');
+                numberReq.textContent = '✗ At least one number (0-9)';
+            }
+            
+            // Check special character
+            const specialReq = document.getElementById('req-special');
+            if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+                specialReq.classList.add('valid');
+                specialReq.textContent = '✓ At least one special character (!@#$%^&*)';
+            } else {
+                specialReq.classList.remove('valid');
+                specialReq.textContent = '✗ At least one special character (!@#$%^&*)';
+            }
+        });
+        
+        // Toggle between login and register
+        showRegisterLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            loginForm.classList.add('hidden');
+            registerForm.classList.remove('hidden');
+            clearErrors();
+        });
+        
+        showLoginLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            registerForm.classList.add('hidden');
+            loginForm.classList.remove('hidden');
+            clearErrors();
+        });
+        
+        // Email validation
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+        
+        // Password validation
+        function isValidPassword(password) {
+            const hasLength = password.length >= 6;
+            const hasLetter = /[a-zA-Z]/.test(password);
+            const hasNumber = /[0-9]/.test(password);
+            const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+            
+            return hasLength && hasLetter && hasNumber && hasSpecial;
+        }
+        
+        // Show custom modal
+        function showModal(title, message, type = 'error') {
+            //const modalIcon = document.getElementById('modalIcon');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+            
+            //modalIcon.className = `modal-icon ${type}`;
+            //modalIcon.textContent = type === 'error' ? '' : '';
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            
+            modal.classList.add('show');
+        }
+        
+        function closeModal() {
+            modal.classList.remove('show');
+        }
+        
+        // Close modal on outside click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+        
+        // Handle Login
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const loginBtn = document.getElementById('loginBtn');
+            
+            // Clear previous errors
+            clearErrors();
+            
+            // Validation
+            let hasError = false;
+            
+            if (!username) {
+                showError('loginUsername', 'Username is required');
+                hasError = true;
+            }
+            
+            if (!password) {
+                showError('loginPassword', 'Password is required');
+                hasError = true;
+            }
+            
+            if (hasError) return;
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+            
+            try {
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Save token to localStorage
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    showModal('Login Successful!', `Welcome back, ${data.user.fullName}!`, 'success');
+                    
+                    // Redirect to main page after 2 seconds
+                    setTimeout(() => {
+                        router.push({ name: 'home' });
+                        //window.location.href = '/';
+                    }, 2000);
+                } else {
+                    showModal(
+                        'Login Failed', 
+                        'Invalid username or password. Please check your credentials and try again.',
+                        'error'
+                    );
+                }
+            } catch (error) {
+                showModal(
+                    'Connection Error',
+                    'Unable to connect to the server. Please check your internet connection and try again.',
+                    'error'
+                );
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login';
+            }
+        });
+        
+        // Handle Register
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fullName = document.getElementById('regFullName').value.trim();
+            const username = document.getElementById('regUsername').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const registerBtn = document.getElementById('registerBtn');
+            
+            // Clear previous errors
+            clearErrors();
+            
+            // Validation
+            let hasError = false;
+            
+            if (!fullName) {
+                showError('regFullName', 'Full name is required');
+                hasError = true;
+            }
+            
+            if (!username) {
+                showError('regUsername', 'Username is required');
+                hasError = true;
+            }
+            
+            if (!email) {
+                showError('regEmail', 'Email is required');
+                hasError = true;
+            } else if (!isValidEmail(email)) {
+                showError('regEmail', 'Please enter a valid email address');
+                hasError = true;
+            }
+            
+            if (!password) {
+                showError('regPassword', 'Password is required');
+                hasError = true;
+            } else if (!isValidPassword(password)) {
+                showError('regPassword', 'Password must be at least 6 characters with letters, numbers, and special characters');
+                hasError = true;
+            }
+            
+            if (hasError) return;
+            
+            registerBtn.disabled = true;
+            registerBtn.textContent = 'Registering...';
+            
+            try {
+                const response = await fetch(`${API_URL}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ fullName, username, email, password })
+                });
+                
+                const data = await response.json();
+                
+                console.log('Server response:', data); // Debug log
+                
+                if (data.success) {
+                    // Save token to localStorage
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    showModal(
+                        'Registration Successful!', 
+                        `Welcome, ${data.user.fullName}! Your account has been created.`,
+                        'success'
+                    );
+                    
+                    // Redirect to main page after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 2000);
+                } else {
+                    showModal(
+                        'Registration Failed',
+                        data.message || data.error || 'Unable to create account. Please try again.',
+                        'error'
+                    );
+                }
+            } catch (error) {
+                console.error('Registration error:', error); // Debug log
+                showModal(
+                    'Connection Error',
+                    `Unable to connect to the server: ${error.message}`,
+                    'error'
+                );
+            } finally {
+                registerBtn.disabled = false;
+                registerBtn.textContent = 'Register';
+            }
+        });
+        
+        function showError(fieldId, message) {
+            const field = document.getElementById(fieldId);
+            const errorElement = document.getElementById(fieldId + 'Error');
+            
+            field.classList.add('error');
+            errorElement.textContent = message;
+            errorElement.classList.add('show');
+        }
+        
+        function clearErrors() {
+            const errorInputs = document.querySelectorAll('input.error');
+            const errorTexts = document.querySelectorAll('.error-text.show');
+            
+            errorInputs.forEach(input => input.classList.remove('error'));
+            errorTexts.forEach(text => text.classList.remove('show'));
+        }
+    </script>
+</body>
+</html>
