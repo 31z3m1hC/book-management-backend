@@ -1,62 +1,105 @@
-
 // Step 1: Import required packages
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config();  // Load .env variables
+const path = require('path');
+require('dotenv').config();
 
-// Add these imports at the top of server.js (after existing imports)
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
-
-// Step 2: Import Book model
-//const Book = require('./models/Book');
 const Book = require('./models/Book');
-
 
 // Step 3: Create Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-
-// Add this secret key after your other constants
 const JWT_SECRET = process.env.JWT_SECRET || "MyApp!2025#ChangeThis$ToRandom";
 
-// Step 4: Middleware (helps Express understand data)
-app.use(cors());              // Allow requests from any website
-app.use(express.json());      // Understand JSON data
-app.use(express.static('public'));  // Serve your portfolio HTML
+// Step 4: Middleware
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? [process.env.FRONTEND_URL, process.env.BACKEND_URL]
+    : ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true
+}));
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Step 5: Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));
-
-
-// ============================================
-// API ROUTES (Your Endpoints)
-// ============================================
-
-// HOME - Check if API is working
-app.get('/api', (req, res) => {
-  res.json({
-    message: 'Book Management API is running!',
-    endpoints: {
-      getAll: 'GET /api/books',
-      getOne: 'GET /api/books/:id',
-      create: 'POST /api/books',
-      update: 'PUT /api/books/:id',
-      delete: 'DELETE /api/books/:id',
-      search: 'GET /api/books/search/:query'
-    }
+  .catch((err) => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
   });
+
+
+// ============================================
+// AUTHENTICATION MIDDLEWARE
+// ============================================
+const authenticateToken = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Access denied. No token provided.' 
+    });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(403).json({ 
+      success: false, 
+      message: 'Invalid or expired token' 
+    });
+  }
+};
+
+
+// ============================================
+// API ROUTES
+// ============================================
+
+// HOME - API Info
+app.get('/api', async (req, res) => {
+  try {
+    const books = await Book.find().sort({ createdAt: -1 });
+    
+    res.json({
+      success: true,
+      message: 'Book Management API is running!',
+      count: books.length,
+      data: books,
+      endpoints: {
+        getAll: 'GET /api/books',
+        getOne: 'GET /api/books/:id',
+        create: 'POST /api/books (Admin only)',
+        update: 'PUT /api/books/:id (Admin only)',
+        delete: 'DELETE /api/books/:id (Admin only)',
+        search: 'GET /api/books/search/:query',
+        login: 'POST /api/login',
+        register: 'POST /api/register',
+        profile: 'GET /api/profile'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching data',
+      error: error.message
+    });
+  }
 });
 
 
 // GET ALL BOOKS
 app.get('/api/books', async (req, res) => {
   try {
-    // Find all books, newest first
     const books = await Book.find().sort({ createdAt: -1 });
     
     res.json({
@@ -79,7 +122,6 @@ app.get('/api/books/:id', async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
     
-    // If book doesn't exist
     if (!book) {
       return res.status(404).json({
         success: false,
@@ -101,12 +143,18 @@ app.get('/api/books/:id', async (req, res) => {
 });
 
 
-// CREATE NEW BOOK
-app.post('/api/books', async (req, res) => {
+// CREATE NEW BOOK (Admin only)
+app.post('/api/books', authenticateToken, async (req, res) => {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only administrators can create books'
+      });
+    }
+
     const { title, author, published, rating, yearPublished, isbn } = req.body;
     
-    // Check if required fields are provided
     if (!title || !author || !yearPublished || !isbn) {
       return res.status(400).json({
         success: false,
@@ -114,7 +162,6 @@ app.post('/api/books', async (req, res) => {
       });
     }
     
-    // Create new book
     const book = await Book.create({
       title,
       author,
@@ -130,7 +177,6 @@ app.post('/api/books', async (req, res) => {
       data: book
     });
   } catch (error) {
-    // If ISBN already exists
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -147,19 +193,24 @@ app.post('/api/books', async (req, res) => {
 });
 
 
-// UPDATE BOOK
-app.put('/api/books/:id', async (req, res) => {
+// UPDATE BOOK (Admin only)
+app.put('/api/books/:id', authenticateToken, async (req, res) => {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only administrators can update books'
+      });
+    }
+
     const { title, author, published, rating, yearPublished, isbn } = req.body;
     
-    // Find and update book
     const book = await Book.findByIdAndUpdate(
       req.params.id,
       { title, author, published, rating, yearPublished, isbn },
-      { new: true, runValidators: true }  // Return updated book & validate
+      { new: true, runValidators: true }
     );
     
-    // If book doesn't exist
     if (!book) {
       return res.status(404).json({
         success: false,
@@ -182,12 +233,18 @@ app.put('/api/books/:id', async (req, res) => {
 });
 
 
-// DELETE BOOK
-app.delete('/api/books/:id', async (req, res) => {
+// DELETE BOOK (Admin only)
+app.delete('/api/books/:id', authenticateToken, async (req, res) => {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only administrators can delete books'
+      });
+    }
+
     const book = await Book.findByIdAndDelete(req.params.id);
     
-    // If book doesn't exist
     if (!book) {
       return res.status(404).json({
         success: false,
@@ -215,7 +272,6 @@ app.get('/api/books/search/:query', async (req, res) => {
   try {
     const searchQuery = req.params.query;
     
-    // Search in title, author, or ISBN (case-insensitive)
     const books = await Book.find({
       $or: [
         { title: { $regex: searchQuery, $options: 'i' } },
@@ -239,40 +295,15 @@ app.get('/api/books/search/:query', async (req, res) => {
 });
 
 
-// Add this middleware function after your existing middleware
-const authenticateToken = (req, res, next) => {
-  const token = req.headers['authorization']?.split(' ')[1]; // Get token from "Bearer TOKEN"
-  
-  if (!token) {
-    return res.status(401).json({ 
-      success: false, 
-      message: 'Access denied. No token provided.' 
-    });
-  }
-  
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (error) {
-    res.status(403).json({ 
-      success: false, 
-      message: 'Invalid or expired token' 
-    });
-  }
-};
-
 // ============================================
-// ADD THESE AUTHENTICATION ROUTES
-// (Add after your existing routes, before app.listen)
+// AUTHENTICATION ROUTES
 // ============================================
 
-// REGISTER - Create new user account
+// REGISTER
 app.post('/api/register', async (req, res) => {
   try {
     const { username, email, password, fullName } = req.body;
     
-    // Check if required fields are provided
     if (!username || !email || !password || !fullName) {
       return res.status(400).json({
         success: false,
@@ -280,7 +311,6 @@ app.post('/api/register', async (req, res) => {
       });
     }
     
-    // Check if user already exists
     const existingUser = await User.findOne({ 
       $or: [{ email }, { username }] 
     });
@@ -292,20 +322,18 @@ app.post('/api/register', async (req, res) => {
       });
     }
     
-    // Create new user (password will be hashed automatically by User model)
     const user = await User.create({
       username,
       email,
       password,
       fullName,
-      role: 'user' // Default role
+      role: 'user'
     });
     
-    // Create JWT token
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: '7d' } // Token expires in 7 days
+      { expiresIn: '7d' }
     );
     
     res.status(201).json({
@@ -329,12 +357,11 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// LOGIN - Authenticate user
+// LOGIN
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    // Check if credentials provided
     if (!username || !password) {
       return res.status(400).json({
         success: false,
@@ -342,7 +369,6 @@ app.post('/api/login', async (req, res) => {
       });
     }
     
-    // Find user
     const user = await User.findOne({ username });
     
     if (!user) {
@@ -352,7 +378,6 @@ app.post('/api/login', async (req, res) => {
       });
     }
     
-    // Check password
     const isPasswordCorrect = await user.comparePassword(password);
     
     if (!isPasswordCorrect) {
@@ -362,7 +387,6 @@ app.post('/api/login', async (req, res) => {
       });
     }
     
-    // Create JWT token
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       JWT_SECRET,
@@ -390,7 +414,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// GET PROFILE - Get current user info (Protected Route)
+// GET PROFILE
 app.get('/api/profile', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -416,19 +440,11 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
 });
 
 
-// UPDATE ADMIN PASSWORD (Protected Route)
-app.put('/api/admin/update-password', authenticateToken, async (req, res) => {
+// CHANGE ADMIN PASSWORD
+app.put('/api/admin/change-password', authenticateToken, async (req, res) => {
   try {
-    const { newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
 
-    if (!newPassword) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide a new password'
-      });
-    }
-
-    // Only allow admins to update their password
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -436,7 +452,13 @@ app.put('/api/admin/update-password', authenticateToken, async (req, res) => {
       });
     }
 
-    // Find the admin user
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide current password and new password'
+      });
+    }
+
     const admin = await User.findById(req.user.id);
     if (!admin) {
       return res.status(404).json({
@@ -445,7 +467,14 @@ app.put('/api/admin/update-password', authenticateToken, async (req, res) => {
       });
     }
 
-    // Set new password (will be hashed by pre('save') hook)
+    const isPasswordCorrect = await admin.comparePassword(currentPassword);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
     admin.password = newPassword;
     await admin.save();
 
@@ -463,33 +492,12 @@ app.put('/api/admin/update-password', authenticateToken, async (req, res) => {
 });
 
 
-
-
 // ============================================
 // START SERVER
 // ============================================
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-  console.log(`API available at http://localhost:${PORT}/api`);
-  console.log(`Portfolio at http://localhost:${PORT}`);
+  console.log('Server is running on http://localhost:' + PORT);
+  console.log('Portfolio available at http://localhost:' + PORT + '/');
+  console.log('API available at http://localhost:' + PORT + '/api');
+  console.log('Environment: ' + (process.env.NODE_ENV || 'development'));
 });
-
-
-
-// ============================================
-// QUICK REFERENCE
-// ============================================
-/*
-To run this server:
-1. Make sure MongoDB URI is in your .env file
-2. Run: npm start
-3. Test in browser: http://localhost:3000/api
-
-To test with curl:
-- Get all books:    curl http://localhost:3000/api/books
-- Get one book:     curl http://localhost:3000/api/books/BOOK_ID
-- Create book:      curl -X POST http://localhost:3000/api/books -H "Content-Type: application/json" -d '{"title":"Test Book","author":"John Doe","yearPublished":2024,"isbn":"123456"}'
-- Update book:      curl -X PUT http://localhost:3000/api/books/BOOK_ID -H "Content-Type: application/json" -d '{"title":"Updated Title"}'
-- Delete book:      curl -X DELETE http://localhost:3000/api/books/BOOK_ID
-- Search books:     curl http://localhost:3000/api/books/search/gatsby
-*/
