@@ -4,8 +4,6 @@ initialSetup.js
 
 
 # Ignore ALL package files
-package-lock.json
-package.json
 yarn.lock
 pnpm-lock.yaml
 
