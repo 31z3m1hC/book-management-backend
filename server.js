@@ -508,5 +508,5 @@ app.listen(PORT, () => {
   console.log('API available at http://localhost:' + PORT + '/api');
   console.log('Environment: ' + (process.env.NODE_ENV || 'development'));
   console.log('  - https://chimezie-book-manager.netlify.app');
-  console.log('  - https://book-manager-api-ym1o.onrender.com/api');
+  console.log('  - https://book-manager-api-ym1o.onrender.com/');
 });
