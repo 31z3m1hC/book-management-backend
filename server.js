@@ -25,7 +25,7 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:3000',
     'https://chimezie-book-manager.netlify.app',  
-    'https://book-manager-api-ym1o.onrender.com',
+    'https://chimezie-book-manager-api-ym1o.onrender.com',
   ],
   credentials: true
 }));
@@ -397,7 +397,7 @@ app.post('/api/login', async (req, res) => {
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '60d' }
     );
     
     res.json({
@@ -507,4 +507,6 @@ app.listen(PORT, () => {
   console.log('Portfolio available at http://localhost:' + PORT + '/');
   console.log('API available at http://localhost:' + PORT + '/api');
   console.log('Environment: ' + (process.env.NODE_ENV || 'development'));
+  console.log('  - https://chimezie-book-manager.netlify.app');
+  console.log('  - https://chimezie-book-manager-api-ym1o.onrender.com');
 });
