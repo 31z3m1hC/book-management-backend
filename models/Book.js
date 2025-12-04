@@ -1,4 +1,4 @@
-// This defines what a "Book" looks like in our database
+// This defines what a "Book" Schema looks like in our database
 
 const mongoose = require('mongoose');
 
@@ -6,34 +6,34 @@ const mongoose = require('mongoose');
 const bookSchema = new mongoose.Schema({
   title: {
     type: String,
-    required: true  // Must have a title
+    required: true  
   },
   author: {
     type: String,
-    required: true  // Must have an author
+    required: true  
   },
   published: {
     type: Boolean,
-    default: false  // Is the book published? Default: no
+    default: false  
   },
   rating: {
     type: Number,
-    min: 0,        // Minimum rating: 0
-    max: 5,        // Maximum rating: 5
-    default: 0     // Default rating: 0
+    min: 0,        
+    max: 5,        
+    default: 0     
   },
   yearPublished: {
     type: Number,
-    required: true  // Must have a year
+    required: true  
   },
   isbn: {
     type: String,
-    required: true, // Must have ISBN
-    unique: true    // Each ISBN must be unique
+    required: true, 
+    unique: true    
   }
 }, {
-  timestamps: true  // Automatically add createdAt and updatedAt
+  timestamps: true  
 });
 
-
+// export the model to use it elsewhere
 module.exports = mongoose.model('Book', bookSchema);

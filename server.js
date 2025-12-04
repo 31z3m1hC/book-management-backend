@@ -5,6 +5,9 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+// Step 2: Import models
+
+// Used to verfy logged in users and their roles
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 const Book = require('./models/Book');
@@ -13,14 +16,15 @@ const Book = require('./models/Book');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+//Read JWT Secret from environment or use default(used to verify tokens issued by the server itself)
 const JWT_SECRET = process.env.JWT_SECRET || "MyApp!2025#ChangeThis$ToRandom";
 
-// Step 4: Middleware
+// Step 4: Middleware: Only allow requests from specific origins
 app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:3000',
-    'https://chimezie-book-manager.netlify.app',  // ← Add your Netlify URL
+    'https://chimezie-book-manager.netlify.app',  
     'https://book-manager-api-ym1o.onrender.com',
   ],
   credentials: true
@@ -336,7 +340,7 @@ app.post('/api/register', async (req, res) => {
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '60d' }
     );
     
     res.status(201).json({
