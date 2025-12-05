@@ -499,14 +499,30 @@ app.put('/api/admin/change-password', authenticateToken, async (req, res) => {
 });
 
 
+
 // ============================================
 // START SERVER
 // ============================================
 app.listen(PORT, () => {
-  console.log('Server is running on http://localhost:' + PORT);
-  console.log('Portfolio available at http://localhost:' + PORT + '/');
-  console.log('API available at http://localhost:' + PORT + '/api');
-  console.log('Environment: ' + (process.env.NODE_ENV || 'development'));
+  console.log('========================================');
+  console.log('Book Management API Server Started');
+  console.log('========================================');
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`Port: ${PORT}`);
+  console.log('');
+  console.log('Local URLs:');
+  console.log(`  - Server: http://localhost:${PORT}`);
+  console.log(`  - Portfolio: http://localhost:${PORT}/`);
+  console.log(`  - API: http://localhost:${PORT}/api`);
+  console.log('');
+  console.log('Production URLs:');
+  console.log('  - Frontend: https://chimezie-book-manager.netlify.app');
+  console.log('  - API: https://book-manager-api-ym1o.onrender.com/api');
+  console.log('');
+  console.log('Allowed CORS Origins:');
+  console.log('  - http://localhost:5173');
+  console.log('  - http://localhost:3000');
   console.log('  - https://chimezie-book-manager.netlify.app');
-  console.log('  - https://book-manager-api-ym1o.onrender.com/');
+  console.log('  - https://book-manager-api-ym1o.onrender.com');
+  console.log('========================================');
 });
