@@ -1,0 +1,279 @@
+The development of the UI design is an extraction of my professors <style> section of his express js  code from his class exercises. The remaining code was built from different sources such as youtube: https://www.youtube.com/watch?v=QEcuSSnqvck, google.com searches, stackoverflow.com: https://stackoverflow.com/search?q=axios&s=d157b7ff-b86f-4efc-af8c-3e045f13faad, and assembled with the express help of Claude AI.
+
+
+1. Project Setup (Lines 1-18)
+
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+
+
+What's happening:
+- Express: A framework to build web servers (handles HTTP requests)
+- Mongoose: Talks to MongoDB database (stores your books and users)
+- CORS: Allows your frontend (Netlify) to talk to your backend (Render)
+
+Why these choices:
+- Express is the most popular Node.js framework (easy to learn)
+- Mongoose makes MongoDB easier to work with
+- CORS is required when frontend and backend are on different domains
+
+
+
+2. JWT Authentication (Lines 20-21)
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || "MyApp!2025#ChangeThis$ToRandom";
+
+
+What is JWT?
+Think of it like a movie ticket:
+1. User logs in → Server gives them a "ticket" (token)
+2. User wants to do something (add book) → Shows the ticket
+3. Server checks ticket is valid → Allows or denies action
+
+Why JWT?
+- Stateless (server doesn't need to remember who's logged in)
+- Secure (can't be faked if secret is strong)
+- Contains user info (role, username)
+
+
+
+3. CORS Configuration (Lines 24-32)
+
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    'https://chimezie-book-manager.netlify.app',
+  ],
+  credentials: true
+}));
+
+
+What's CORS?
+Imagine your frontend is in building A (Netlify) and backend is in building B (Render). By default, browsers block requests between buildings for security.
+
+CORS says: "These specific buildings are allowed to talk to me."
+
+Why this matters:
+Without CORS, your Vue app can't fetch data from your API.
+
+---
+
+4. Authentication Middleware (Lines 47-67)
+
+javascript
+const authenticateToken = (req, res, next) => {
+  const token = req.headers['authorization']?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ message: 'No token provided.' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(403).json({ message: 'Invalid token' });
+  }
+};
+
+
+What it does:
+1. Checks if request has a token (the "ticket")
+2. Verifies the token is real (not fake)
+3. Extracts user info from token (who are you? what role?)
+4. Either allows request to continue (`next()`) or rejects it
+
+Why it's important:
+Prevents random people from deleting your books. Only logged-in users (with valid tokens) can proceed.
+
+
+5. CRUD Operations
+
+GET /api/books** (Read all books)
+app.get('/api/books', async (req, res) => {
+  const books = await Book.find().sort({ createdAt: -1 });
+  res.json({ success: true, count: books.length, data: books });
+});
+
+
+Plain English:
+- Find ALL books in database
+- Sort by newest first (`-1` means descending)
+- Send back as JSON
+
+Why `async/await`?
+Database operations take time. `await` says "wait for this to finish before moving on."
+
+---
+
+POST /api/books (Create book - Admin only)
+app.post('/api/books', authenticateToken, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Only admins can create books' });
+  }
+  
+  const { title, author, yearPublished, isbn } = req.body;
+  
+  if (!title || !author || !yearPublished || !isbn) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+  
+  const book = await Book.create({ title, author, yearPublished, isbn });
+  res.status(201).json({ success: true, data: book });
+});
+
+
+Plain English:
+1. First, check if user is logged in (`authenticateToken`)
+2. Then check if they're an admin
+3. Validate they sent all required data
+4. Create the book in database
+5. Return the new book
+
+Why check role?
+You don't want regular users creating/deleting books. Only admins should have that power.
+
+
+PUT /api/books/:id (Update book)
+app.put('/api/books/:id', authenticateToken, async (req, res) => {
+  const book = await Book.findByIdAndUpdate(
+    req.params.id,
+    { title, author, published, rating, yearPublished, isbn },
+    { new: true, runValidators: true }
+  );
+  
+  if (!book) {
+    return res.status(404).json({ message: 'Book not found' });
+  }
+  
+  res.json({ success: true, data: book });
+});
+
+
+Plain English:
+- `:id` in URL means "give me the book ID"
+- Find that book and update it
+- `new: true` returns the updated version (not old one)
+- `runValidators` checks data is valid before saving
+
+
+DELETE /api/books/:id (Delete book)
+app.delete('/api/books/:id', authenticateToken, async (req, res) => {
+  const book = await Book.findByIdAndDelete(req.params.id);
+  
+  if (!book) {
+    return res.status(404).json({ message: 'Book not found' });
+  }
+  
+  res.json({ success: true, message: 'Book deleted' });
+});
+
+
+Plain English:
+Find the book by ID and delete it. If it doesn't exist, return 404 error.
+
+
+6. Authentication Routes
+
+POST /api/register
+app.post('/api/register', async (req, res) => {
+  const { username, email, password, fullName } = req.body;
+  
+  // Check if user already exists
+  const existingUser = await User.findOne({ 
+    $or: [{ email }, { username }] 
+  });
+  
+  if (existingUser) {
+    return res.status(400).json({ message: 'User already exists' });
+  }
+  
+  // Create new user
+  const user = await User.create({ username, email, password, fullName, role: 'user' });
+  
+  // Generate token
+  const token = jwt.sign(
+    { id: user._id, username: user.username, role: user.role },
+    JWT_SECRET,
+    { expiresIn: '60d' }
+  );
+  
+  res.status(201).json({ success: true, token, user });
+});
+
+
+Plain English:
+1. Get user details from request
+2. Check if username/email already taken
+3. If not, create the user (password gets hashed automatically by your User model)
+4. Generate a JWT token for them
+5. Send back token + user info
+
+Why check for existing user?
+Can't have two people with same username/email.
+
+---
+
+POST /api/login
+
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  
+  const user = await User.findOne({ username });
+  
+  if (!user) {
+    return res.status(401).json({ message: 'Invalid credentials' });
+  }
+  
+  const isPasswordCorrect = await user.comparePassword(password);
+  
+  if (!isPasswordCorrect) {
+    return res.status(401).json({ message: 'Invalid credentials' });
+  }
+  
+  const token = jwt.sign(...);
+  
+  res.json({ success: true, token, user });
+});
+
+
+1. Find user by username
+2. Check if password matches (using bcrypt comparison)
+3. If yes, generate token
+4. If no, return error
+
+Why not say "wrong password" specifically?
+Security best practice: Don't tell attackers which part is wrong (username or password).
+
+
+HTTP Status Codes:
+- `200` = Success
+- `201` = Created (used when creating new resource)
+- `400` = Bad Request (user sent invalid data)
+- `401` = Unauthorized (not logged in)
+- `403` = Forbidden (logged in but not allowed)
+- `404` = Not Found
+- `500` = Server Error
+
+Why async/await?
+Database operations are slow. Instead of blocking everything, `async/await` lets other requests process while waiting.
+
+Why separate authentication routes from book routes?
+Organization and security. Auth doesn't need `authenticateToken` middleware (you can't check auth before logging in!).
+
+Q: Why use JWT instead of sessions?
+A:JWT is stateless (no server memory needed). Good for scaling. Sessions require server to store who's logged in.
+
+Q: What happens if JWT_SECRET is compromised?
+A: Anyone could create fake tokens and impersonate users. That's why it's in `.env` and never committed to Git.
+
+Q: Why check req.user.role instead of trusting the client?
+A: Never trust the client! Someone could modify frontend code to claim they're admin. Server must verify.
+
+Q: What's the difference between `findById` and `findOne`?**
+A:`findById` finds by MongoDB's `_id`. `findOne` can search by any field (like username).
+
+
+

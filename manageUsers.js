@@ -1,6 +1,8 @@
 // manageUsers.js
-// Script to manage users and their roles
-// Usage: node manageUsers.js
+// A command-line tool to manage users in a MongoDB database.
+// Features: create user, list users, change role, change password, delete user.
+// Usage: Ensure MONGODB_URI is set in .env file.
+// Run: node manageUsers.js
 
 const mongoose = require('mongoose');
 const User = require('./models/User');
@@ -11,39 +13,38 @@ const readline = require('readline').createInterface({
   output: process.stdout
 });
 
-const question = (query) => new Promise((resolve) => readline.question(query, resolve));
+const ask = (query) => new Promise((resolve) => readline.question(query, resolve));
 
-// Validate password format
-const isValidPassword = (password) => {
+// Check if password is strong enough
+function checkPassword(password) {
   const hasLength = password.length >= 6;
   const hasLetter = /[a-zA-Z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
   
   return hasLength && hasLetter && hasNumber && hasSpecial;
-};
+}
 
-const manageUsers = async () => {
+async function main() {
   try {
-    // Connect to MongoDB
     await mongoose.connect(process.env.MONGODB_URI);
-    console.log('Connected to MongoDB\n');
+    console.log('Connected to database\n');
 
     let running = true;
 
     while (running) {
-      console.log('═══════════════════════════════════════════════');
-      console.log('         USER MANAGEMENT SYSTEM');
-      console.log('═══════════════════════════════════════════════');
-      console.log('1. Create new user');
-      console.log('2. List all users');
-      console.log('3. Update user role');
-      console.log('4. Update user password');
+      console.log('----------------------------------');
+      console.log('USER MANAGEMENT');
+      console.log('----------------------------------');
+      console.log('1. Create user');
+      console.log('2. List users');
+      console.log('3. Change role');
+      console.log('4. Change password');
       console.log('5. Delete user');
       console.log('6. Exit');
-      console.log('═══════════════════════════════════════════════\n');
+      console.log('----------------------------------\n');
 
-      const choice = await question('Select an option (1-6): ');
+      const choice = await ask('Choose option (1-6): ');
 
       switch (choice) {
         case '1':
@@ -53,20 +54,20 @@ const manageUsers = async () => {
           await listUsers();
           break;
         case '3':
-          await updateUserRole();
+          await changeRole();
           break;
         case '4':
-          await updateUserPassword();
+          await changePassword();
           break;
         case '5':
           await deleteUser();
           break;
         case '6':
           running = false;
-          console.log('\nGoodbye!\n');
+          console.log('\nBye!\n');
           break;
         default:
-          console.log('\nInvalid option. Please try again.\n');
+          console.log('\nInvalid choice\n');
       }
     }
 
@@ -76,42 +77,38 @@ const manageUsers = async () => {
     readline.close();
     mongoose.connection.close();
   }
-};
+}
 
-// Create new user
-const createUser = async () => {
+async function createUser() {
   try {
-    console.log('\n--- CREATE NEW USER ---\n');
+    console.log('\n--- Create User ---\n');
     
-    const username = await question('Username: ');
-    const email = await question('Email: ');
-    const password = await question('Password (min 6 chars, letter+number+special): ');
-    const fullName = await question('Full Name: ');
-    const role = await question('Role (admin/user) [default: user]: ') || 'user';
+    const username = await ask('Username: ');
+    const email = await ask('Email: ');
+    const password = await ask('Password: ');
+    const fullName = await ask('Full Name: ');
+    const role = await ask('Role (admin/user) [user]: ') || 'user';
 
-    // Validate password
-    if (!isValidPassword(password)) {
-      console.log('\nPassword must be at least 6 characters with letters, numbers, and special characters\n');
+    if (!checkPassword(password)) {
+      console.log('\nPassword too weak (need 6+ chars, letter, number, special char)\n');
       return;
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ 
+    // Check if username/email already taken
+    const existing = await User.findOne({ 
       $or: [{ email }, { username }] 
     });
 
-    if (existingUser) {
-      console.log('\nUser with this username or email already exists!\n');
+    if (existing) {
+      console.log('\nUsername or email already exists\n');
       return;
     }
 
-    // Validate role
     if (role !== 'admin' && role !== 'user') {
-      console.log('\nInvalid role. Must be "admin" or "user"\n');
+      console.log('\nRole must be admin or user\n');
       return;
     }
 
-    // Create user - password will be hashed by the pre('save') middleware
     const user = await User.create({
       username,
       email,
@@ -120,149 +117,133 @@ const createUser = async () => {
       role
     });
 
-    console.log('\nUser created successfully!');
-    console.log('═══════════════════════════════════');
+    console.log('\nUser created!');
     console.log('Username:', user.username);
     console.log('Email:', user.email);
-    console.log('Full Name:', user.fullName);
     console.log('Role:', user.role);
-    console.log('═══════════════════════════════════\n');
+    console.log('');
 
   } catch (error) {
-    console.error('\nError creating user:', error.message, '\n');
+    console.error('\nError:', error.message, '\n');
   }
-};
+}
 
-// List all users
-const listUsers = async () => {
+async function listUsers() {
   try {
-    console.log('\n--- ALL USERS ---\n');
+    console.log('\n--- All Users ---\n');
     
     const users = await User.find().select('-password').sort({ createdAt: -1 });
 
     if (users.length === 0) {
-      console.log('No users found.\n');
+      console.log('No users found\n');
       return;
     }
 
-    console.log('═══════════════════════════════════════════════════════════════════════');
-    console.log('Username\t\tRole\t\tEmail\t\t\t\tFull Name');
-    console.log('═══════════════════════════════════════════════════════════════════════');
+    console.log('Username\t\tRole\t\tEmail');
+    console.log('--------------------------------------------------');
     
     users.forEach(user => {
-      const username = user.username.padEnd(16);
-      const role = user.role.padEnd(12);
-      const email = user.email.padEnd(32);
-      console.log(`${username}${role}${email}${user.fullName}`);
+      console.log(`${user.username.padEnd(20)}${user.role.padEnd(12)}${user.email}`);
     });
     
-    console.log('═══════════════════════════════════════════════════════════════════════');
-    console.log(`Total users: ${users.length}\n`);
+    console.log(`\nTotal: ${users.length}\n`);
 
   } catch (error) {
-    console.error('\nError listing users:', error.message, '\n');
+    console.error('\nError:', error.message, '\n');
   }
-};
+}
 
-// Update user role
-const updateUserRole = async () => {
+async function changeRole() {
   try {
-    console.log('\n--- UPDATE USER ROLE ---\n');
+    console.log('\n--- Change Role ---\n');
     
-    const username = await question('Enter username: ');
+    const username = await ask('Username: ');
     const user = await User.findOne({ username });
 
     if (!user) {
-      console.log('\nUser not found!\n');
+      console.log('\nUser not found\n');
       return;
     }
 
-    console.log(`\nCurrent role: ${user.role}`);
-    const newRole = await question('New role (admin/user): ');
+    console.log(`Current role: ${user.role}`);
+    const newRole = await ask('New role (admin/user): ');
 
     if (newRole !== 'admin' && newRole !== 'user') {
-      console.log('\nInvalid role. Must be "admin" or "user"\n');
+      console.log('\nInvalid role\n');
       return;
     }
 
     user.role = newRole;
     await user.save();
 
-    console.log('\nUser role updated successfully!');
-    console.log('═══════════════════════════════════');
+    console.log('\nRole updated!');
     console.log('Username:', user.username);
-    console.log('New Role:', user.role);
-    console.log('═══════════════════════════════════\n');
+    console.log('New role:', user.role);
+    console.log('');
 
   } catch (error) {
-    console.error('\nError updating role:', error.message, '\n');
+    console.error('\nError:', error.message, '\n');
   }
-};
+}
 
-// Update user password
-const updateUserPassword = async () => {
+async function changePassword() {
   try {
-    console.log('\n--- UPDATE USER PASSWORD ---\n');
+    console.log('\n--- Change Password ---\n');
     
-    const username = await question('Enter username: ');
+    const username = await ask('Username: ');
     const user = await User.findOne({ username });
 
     if (!user) {
-      console.log('\nUser not found!\n');
+      console.log('\nUser not found\n');
       return;
     }
 
-    const newPassword = await question('Enter new password (min 6 chars, letter+number+special): ');
+    const newPassword = await ask('New password: ');
     
-    // Validate password
-    if (!isValidPassword(newPassword)) {
-      console.log('\nPassword must be at least 6 characters with letters, numbers, and special characters\n');
+    if (!checkPassword(newPassword)) {
+      console.log('\nPassword too weak\n');
       return;
     }
     
-    // Set new password - will be hashed by pre('save') middleware
     user.password = newPassword;
     await user.save();
 
-    console.log('\nPassword updated successfully for user:', username, '\n');
+    console.log('\nPassword updated!\n');
 
   } catch (error) {
-    console.error('\nError updating password:', error.message, '\n');
+    console.error('\nError:', error.message, '\n');
   }
-};
+}
 
-// Delete user
-const deleteUser = async () => {
+async function deleteUser() {
   try {
-    console.log('\n--- DELETE USER ---\n');
+    console.log('\n--- Delete User ---\n');
     
-    const username = await question('Enter username to delete: ');
+    const username = await ask('Username: ');
     const user = await User.findOne({ username });
 
     if (!user) {
-      console.log('\nUser not found!\n');
+      console.log('\nUser not found\n');
       return;
     }
 
-    console.log('\nUser details:');
+    console.log('\nUser info:');
     console.log('Username:', user.username);
     console.log('Email:', user.email);
     console.log('Role:', user.role);
-    console.log('Full Name:', user.fullName);
     
-    const confirm = await question('\nAre you sure you want to delete this user? (yes/no): ');
+    const confirm = await ask('\nDelete? (yes/no): ');
 
     if (confirm.toLowerCase() === 'yes') {
       await User.findByIdAndDelete(user._id);
-      console.log('\nUser deleted successfully!\n');
+      console.log('\nUser deleted\n');
     } else {
-      console.log('\nDeletion cancelled.\n');
+      console.log('\nCancelled\n');
     }
 
   } catch (error) {
-    console.error('\nError deleting user:', error.message, '\n');
+    console.error('\nError:', error.message, '\n');
   }
-};
+}
 
-// Run the function
-manageUsers();
+main();

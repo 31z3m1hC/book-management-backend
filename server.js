@@ -1,25 +1,18 @@
-// Step 1: Import required packages
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-// Step 2: Import models
-
-// Used to verfy logged in users and their roles
 const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 const Book = require('./models/Book');
 
-// Step 3: Create Express app
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-//Read JWT Secret from environment or use default(used to verify tokens issued by the server itself)
 const JWT_SECRET = process.env.JWT_SECRET || "MyApp!2025#ChangeThis$ToRandom";
 
-// Step 4: Middleware: Only allow requests from specific origins
+// Middleware
 app.use(cors({
   origin: [
     'http://localhost:5173',
@@ -33,7 +26,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Step 5: Connect to MongoDB
+// Connect to database
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => {
@@ -41,45 +34,39 @@ mongoose.connect(process.env.MONGODB_URI)
     process.exit(1);
   });
 
-
-// ============================================
-// AUTHENTICATION MIDDLEWARE
-// ============================================
-const authenticateToken = (req, res, next) => {
-  const token = req.headers['authorization']?.split(' ')[1];
+// Check if user is logged in
+function checkAuth(req, res, next) {
+  const authHeader = req.headers['authorization'];
   
-  if (!token) {
+  if (!authHeader) {
     return res.status(401).json({ 
       success: false, 
-      message: 'Access denied. No token provided.' 
+      message: 'No token provided' 
     });
   }
+
+  const token = authHeader.split(' ')[1];
   
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(403).json({ 
+    return res.status(403).json({ 
       success: false, 
-      message: 'Invalid or expired token' 
+      message: 'Invalid token' 
     });
   }
-};
+}
 
-
-// ============================================
-// API ROUTES
-// ============================================
-
-// HOME - API Info
+// API info page
 app.get('/api', async (req, res) => {
   try {
     const books = await Book.find().sort({ createdAt: -1 });
     
     res.json({
       success: true,
-      message: 'Book Management API is running!',
+      message: 'Book Management API',
       count: books.length,
       data: books,
       endpoints: {
@@ -103,12 +90,10 @@ app.get('/api', async (req, res) => {
   }
 });
 
-
-// GET ALL BOOKS
+// Get all books
 app.get('/api/books', async (req, res) => {
   try {
     const books = await Book.find().sort({ createdAt: -1 });
-    
     res.json({
       success: true,
       count: books.length,
@@ -117,14 +102,13 @@ app.get('/api/books', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error fetching books',
+      message: 'Error getting books',
       error: error.message
     });
   }
 });
 
-
-// GET ONE BOOK BY ID
+// Get one book
 app.get('/api/books/:id', async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
@@ -143,29 +127,30 @@ app.get('/api/books/:id', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error fetching book',
+      message: 'Error getting book',
       error: error.message
     });
   }
 });
 
-
-// CREATE NEW BOOK (Admin only)
-app.post('/api/books', authenticateToken, async (req, res) => {
+// Add new book (admin only)
+app.post('/api/books', checkAuth, async (req, res) => {
   try {
+    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
-        message: 'Only administrators can create books'
+        message: 'Only admins can add books'
       });
     }
 
     const { title, author, published, rating, yearPublished, isbn } = req.body;
     
+    // Make sure required fields are provided
     if (!title || !author || !yearPublished || !isbn) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide title, author, yearPublished, and isbn'
+        message: 'Missing required fields'
       });
     }
     
@@ -180,33 +165,33 @@ app.post('/api/books', authenticateToken, async (req, res) => {
     
     res.status(201).json({
       success: true,
-      message: 'Book created successfully!',
+      message: 'Book added',
       data: book
     });
   } catch (error) {
+    // Check for duplicate ISBN
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        message: 'A book with this ISBN already exists'
+        message: 'ISBN already exists'
       });
     }
     
     res.status(500).json({
       success: false,
-      message: 'Error creating book',
+      message: 'Error adding book',
       error: error.message
     });
   }
 });
 
-
-// UPDATE BOOK (Admin only)
-app.put('/api/books/:id', authenticateToken, async (req, res) => {
+// Update book (admin only)
+app.put('/api/books/:id', checkAuth, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
-        message: 'Only administrators can update books'
+        message: 'Only admins can update books'
       });
     }
 
@@ -227,7 +212,7 @@ app.put('/api/books/:id', authenticateToken, async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Book updated successfully!',
+      message: 'Book updated',
       data: book
     });
   } catch (error) {
@@ -239,14 +224,13 @@ app.put('/api/books/:id', authenticateToken, async (req, res) => {
   }
 });
 
-
-// DELETE BOOK (Admin only)
-app.delete('/api/books/:id', authenticateToken, async (req, res) => {
+// Delete book (admin only)
+app.delete('/api/books/:id', checkAuth, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
-        message: 'Only administrators can delete books'
+        message: 'Only admins can delete books'
       });
     }
 
@@ -261,7 +245,7 @@ app.delete('/api/books/:id', authenticateToken, async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Book deleted successfully!',
+      message: 'Book deleted',
       data: book
     });
   } catch (error) {
@@ -273,8 +257,7 @@ app.delete('/api/books/:id', authenticateToken, async (req, res) => {
   }
 });
 
-
-// SEARCH BOOKS
+// Search books
 app.get('/api/books/search/:query', async (req, res) => {
   try {
     const searchQuery = req.params.query;
@@ -295,18 +278,13 @@ app.get('/api/books/search/:query', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error searching books',
+      message: 'Error searching',
       error: error.message
     });
   }
 });
 
-
-// ============================================
-// AUTHENTICATION ROUTES
-// ============================================
-
-// REGISTER
+// Register new user
 app.post('/api/register', async (req, res) => {
   try {
     const { username, email, password, fullName } = req.body;
@@ -314,10 +292,11 @@ app.post('/api/register', async (req, res) => {
     if (!username || !email || !password || !fullName) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide username, email, password, and fullName'
+        message: 'All fields required'
       });
     }
     
+    // Check if user already exists
     const existingUser = await User.findOne({ 
       $or: [{ email }, { username }] 
     });
@@ -325,7 +304,7 @@ app.post('/api/register', async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Username or email already exists'
+        message: 'Username or email already taken'
       });
     }
     
@@ -337,6 +316,7 @@ app.post('/api/register', async (req, res) => {
       role: 'user'
     });
     
+    // Create token
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       JWT_SECRET,
@@ -345,7 +325,7 @@ app.post('/api/register', async (req, res) => {
     
     res.status(201).json({
       success: true,
-      message: 'User registered successfully!',
+      message: 'Registration successful',
       token,
       user: {
         id: user._id,
@@ -358,13 +338,13 @@ app.post('/api/register', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error registering user',
+      message: 'Registration error',
       error: error.message
     });
   }
 });
 
-// LOGIN
+// Login
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -372,7 +352,7 @@ app.post('/api/login', async (req, res) => {
     if (!username || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide username and password'
+        message: 'Username and password required'
       });
     }
     
@@ -381,7 +361,7 @@ app.post('/api/login', async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid username or password'
+        message: 'Invalid credentials'
       });
     }
     
@@ -390,7 +370,7 @@ app.post('/api/login', async (req, res) => {
     if (!isPasswordCorrect) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid username or password'
+        message: 'Invalid credentials'
       });
     }
     
@@ -402,7 +382,7 @@ app.post('/api/login', async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Login successful!',
+      message: 'Login successful',
       token,
       user: {
         id: user._id,
@@ -415,14 +395,14 @@ app.post('/api/login', async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error logging in',
+      message: 'Login error',
       error: error.message
     });
   }
 });
 
-// GET PROFILE
-app.get('/api/profile', authenticateToken, async (req, res) => {
+// Get user profile
+app.get('/api/profile', checkAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     
@@ -440,29 +420,28 @@ app.get('/api/profile', authenticateToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error fetching profile',
+      message: 'Error getting profile',
       error: error.message
     });
   }
 });
 
-
-// CHANGE ADMIN PASSWORD
-app.put('/api/admin/change-password', authenticateToken, async (req, res) => {
+// Change admin password
+app.put('/api/admin/change-password', checkAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. Only admins can update their password.'
+        message: 'Admin only'
       });
     }
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide current password and new password'
+        message: 'Both passwords required'
       });
     }
 
@@ -470,7 +449,7 @@ app.put('/api/admin/change-password', authenticateToken, async (req, res) => {
     if (!admin) {
       return res.status(404).json({
         success: false,
-        message: 'Admin user not found'
+        message: 'User not found'
       });
     }
 
@@ -478,7 +457,7 @@ app.put('/api/admin/change-password', authenticateToken, async (req, res) => {
     if (!isPasswordCorrect) {
       return res.status(401).json({
         success: false,
-        message: 'Current password is incorrect'
+        message: 'Wrong password'
       });
     }
 
@@ -487,42 +466,20 @@ app.put('/api/admin/change-password', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Admin password updated successfully!'
+      message: 'Password updated'
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Error updating admin password',
+      message: 'Error updating password',
       error: error.message
     });
   }
 });
 
-
-
-// ============================================
-// START SERVER
-// ============================================
+// Start server
 app.listen(PORT, () => {
-  console.log('========================================');
-  console.log('Book Management API Server Started');
-  console.log('========================================');
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`Port: ${PORT}`);
-  console.log('');
-  console.log('Local URLs:');
-  console.log(`  - Server: http://localhost:${PORT}`);
-  console.log(`  - Portfolio: http://localhost:${PORT}/`);
-  console.log(`  - API: http://localhost:${PORT}/api`);
-  console.log('');
-  console.log('Production URLs:');
-  console.log('  - Frontend: https://chimezie-book-manager.netlify.app');
-  console.log('  - API: https://book-manager-api-ym1o.onrender.com/api');
-  console.log('');
-  console.log('Allowed CORS Origins:');
-  console.log('  - http://localhost:5173');
-  console.log('  - http://localhost:3000');
-  console.log('  - https://chimezie-book-manager.netlify.app');
-  console.log('  - https://book-manager-api-ym1o.onrender.com');
-  console.log('========================================');
+  console.log('Server running on port', PORT);
+  console.log('Local: http://localhost:' + PORT);
+  console.log('API: http://localhost:' + PORT + '/api');
 });
