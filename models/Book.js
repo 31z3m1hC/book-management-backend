@@ -30,6 +30,10 @@ const bookSchema = new mongoose.Schema({
     type: String,
     required: true, 
     unique: true    
+  },
+  content: {
+    type: String,
+    default: ''     
   }
 }, {
   timestamps: true  

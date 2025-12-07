@@ -144,7 +144,7 @@ app.post('/api/books', checkAuth, async (req, res) => {
       });
     }
 
-    const { title, author, published, rating, yearPublished, isbn } = req.body;
+    const { title, author, published, rating, yearPublished, isbn, content } = req.body;
     
     // Make sure required fields are provided
     if (!title || !author || !yearPublished || !isbn) {
@@ -160,7 +160,8 @@ app.post('/api/books', checkAuth, async (req, res) => {
       published: published || false,
       rating: rating || 0,
       yearPublished,
-      isbn
+      isbn,
+      content: content || ''
     });
     
     res.status(201).json({
@@ -195,11 +196,11 @@ app.put('/api/books/:id', checkAuth, async (req, res) => {
       });
     }
 
-    const { title, author, published, rating, yearPublished, isbn } = req.body;
+    const { title, author, published, rating, yearPublished, isbn, content } = req.body;
     
     const book = await Book.findByIdAndUpdate(
       req.params.id,
-      { title, author, published, rating, yearPublished, isbn },
+      { title, author, published, rating, yearPublished, isbn, content },
       { new: true, runValidators: true }
     );
     
