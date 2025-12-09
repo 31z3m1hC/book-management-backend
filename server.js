@@ -17,7 +17,8 @@ app.use(cors({
   origin: [
     'http://localhost:5173',
     'http://localhost:3000',
-    'https://chimezie-book-manager.netlify.app',  
+    'https://frontend-tau-jet-s9l1vm00r3.vercel.app', 
+    //'https://chimezie-book-manager.netlify.app',  
     'https://book-manager-api-ym1o.onrender.com',
   ],
   credentials: true
