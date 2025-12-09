@@ -163,8 +163,6 @@ app.post('/api/books', checkAuth, async (req, res) => {
       yearPublished,
       isbn,
       content: content || '',
-      image: image || '',
-      link: link || ''
     });
     
     res.status(201).json({
