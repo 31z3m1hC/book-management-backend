@@ -91,6 +91,8 @@ app.get('/api', async (req, res) => {
   }
 });
 
+// =================== Book Routes ===================
+
 // Get all books
 app.get('/api/books', async (req, res) => {
   try {
@@ -137,7 +139,6 @@ app.get('/api/books/:id', async (req, res) => {
 // Add new book (admin only)
 app.post('/api/books', checkAuth, async (req, res) => {
   try {
-    // Check if user is admin
     if (req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -145,9 +146,8 @@ app.post('/api/books', checkAuth, async (req, res) => {
       });
     }
 
-    const { title, author, published, rating, yearPublished, isbn, content } = req.body;
+    const { title, author, published, rating, yearPublished, isbn, content, image, link } = req.body;
     
-    // Make sure required fields are provided
     if (!title || !author || !yearPublished || !isbn) {
       return res.status(400).json({
         success: false,
@@ -162,7 +162,9 @@ app.post('/api/books', checkAuth, async (req, res) => {
       rating: rating || 0,
       yearPublished,
       isbn,
-      content: content || ''
+      content: content || '',
+      image: image || '',
+      link: link || ''
     });
     
     res.status(201).json({
@@ -171,7 +173,6 @@ app.post('/api/books', checkAuth, async (req, res) => {
       data: book
     });
   } catch (error) {
-    // Check for duplicate ISBN
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -197,11 +198,11 @@ app.put('/api/books/:id', checkAuth, async (req, res) => {
       });
     }
 
-    const { title, author, published, rating, yearPublished, isbn, content } = req.body;
+    const { title, author, published, rating, yearPublished, isbn, content, image, link } = req.body;
     
     const book = await Book.findByIdAndUpdate(
       req.params.id,
-      { title, author, published, rating, yearPublished, isbn, content },
+      { title, author, published, rating, yearPublished, isbn, content, image, link },
       { new: true, runValidators: true }
     );
     
@@ -286,7 +287,9 @@ app.get('/api/books/search/:query', async (req, res) => {
   }
 });
 
-// Register new user
+// =================== User Routes ===================
+
+// Register
 app.post('/api/register', async (req, res) => {
   try {
     const { username, email, password, fullName } = req.body;
@@ -298,7 +301,6 @@ app.post('/api/register', async (req, res) => {
       });
     }
     
-    // Check if user already exists
     const existingUser = await User.findOne({ 
       $or: [{ email }, { username }] 
     });
@@ -318,7 +320,6 @@ app.post('/api/register', async (req, res) => {
       role: 'user'
     });
     
-    // Create token
     const token = jwt.sign(
       { id: user._id, username: user.username, role: user.role },
       JWT_SECRET,
@@ -403,7 +404,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Get user profile
+// Get profile
 app.get('/api/profile', checkAuth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -428,7 +429,7 @@ app.get('/api/profile', checkAuth, async (req, res) => {
   }
 });
 
-// Change admin password
+// Admin change password
 app.put('/api/admin/change-password', checkAuth, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -479,7 +480,7 @@ app.put('/api/admin/change-password', checkAuth, async (req, res) => {
   }
 });
 
-// Start server
+// =================== Start Server ===================
 app.listen(PORT, () => {
   console.log('Server running on port', PORT);
   console.log('Local: http://localhost:' + PORT);
