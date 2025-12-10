@@ -18,7 +18,8 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:3000',
     //'https://frontend-tau-jet-s9l1vm00r3.vercel.app', 
-    'https://chimezie-book-manager.netlify.app',  
+    //'https://chimezie-book-manager.netlify.app', 
+    'https://dainty-shortbread-3e3996.netlify.app', 
     'https://book-manager-api-ym1o.onrender.com',
   ],
   credentials: true
